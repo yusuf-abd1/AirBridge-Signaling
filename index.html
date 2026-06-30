@@ -15,8 +15,9 @@
         .drop-zone:hover { border-color: var(--accent); }
         #progressContainer { width: 100%; height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin: 15px 0; display: none; }
         #progressBar { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
-        button { background: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px; width: 100%; display: none; }
+        .download-btn { background: var(--accent); color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 5px; width: 100%; display: block; }
         #logArea { font-size: 0.8rem; color: #94a3b8; }
+        #downloadsList { margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -29,7 +30,7 @@
         </div>
         <div id="progressContainer"><div id="progressBar"></div></div>
         <div id="logArea"></div>
-        <button id="downloadBtn">Download File</button>
+        <div id="downloadsList"></div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -52,16 +53,10 @@
             if (isSending || fileQueue.length === 0) return;
             isSending = true;
             const file = fileQueue.shift();
-            
             document.getElementById('progressContainer').style.display = "block";
             const progressBar = document.getElementById('progressBar');
             const encoder = new TextEncoder();
-            
-            peer.send(encoder.encode(JSON.stringify({ 
-                type: 'start', 
-                name: file.name, 
-                mimeType: file.type 
-            })));
+            peer.send(encoder.encode(JSON.stringify({ type: 'start', name: file.name, mimeType: file.type })));
             
             let offset = 0;
             const reader = new FileReader();
@@ -71,7 +66,6 @@
                 peer.send(e.target.result);
                 offset += e.target.result.byteLength;
                 progressBar.style.width = ((offset / file.size) * 100) + "%";
-                
                 if (offset < file.size) setTimeout(sendNext, 40);
                 else {
                     peer.send(encoder.encode(JSON.stringify({ type: 'end' })));
@@ -93,14 +87,16 @@
                     currentFileMeta = { name: msg.name, type: msg.mimeType };
                     document.getElementById('logArea').innerText = "Receiving: " + msg.name;
                 } else if (msg.type === 'end') {
-                    const btn = document.getElementById('downloadBtn');
-                    btn.style.display = "block";
+                    const btn = document.createElement('button');
+                    btn.className = 'download-btn';
+                    btn.innerText = "Download " + currentFileMeta.name;
                     btn.onclick = () => {
                         const a = document.createElement('a');
                         a.href = URL.createObjectURL(new Blob(receivedChunks, { type: currentFileMeta.type }));
                         a.download = currentFileMeta.name;
                         a.click();
                     };
+                    document.getElementById('downloadsList').appendChild(btn);
                 }
             } else {
                 receivedChunks.push(data);
@@ -118,7 +114,6 @@
             processQueue();
         });
         ['dragover', 'dragleave'].forEach(evt => document.getElementById('dropZone').addEventListener(evt, e => e.preventDefault()));
-        
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
     </script>
 </body>
