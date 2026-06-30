@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
     <title>AirBridge P2P</title>
     <style>
         :root { --bg: #0f172a; --card: #1e293b; --accent: #8b5cf6; --text: #f8fafc; }
@@ -15,6 +16,7 @@
         #progressContainer { width: 100%; height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin: 15px 0; display: none; }
         #progressBar { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s; }
         button { background: var(--accent); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 10px; width: 100%; display: none; }
+        #logArea { font-size: 0.8rem; color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -23,10 +25,10 @@
         <div id="status" class="status-badge">Disconnected</div>
         <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
             <p>Drag & drop or Click</p>
-            <input type="file" id="fileInput" style="display:none">
+            <input type="file" id="fileInput" multiple style="display:none">
         </div>
         <div id="progressContainer"><div id="progressBar"></div></div>
-        <div id="logArea" style="font-size: 0.8rem; color: #94a3b8;"></div>
+        <div id="logArea"></div>
         <button id="downloadBtn">Download File</button>
     </div>
 
@@ -35,7 +37,9 @@
     <script>
         const socket = io("https://airbridge-signaling.onrender.com");
         const peer = new SimplePeer({ initiator: location.hash === '#1', trickle: false });
-        
+        let fileQueue = [];
+        let isSending = false;
+
         peer.on('signal', data => socket.emit('signal', data));
         socket.on('signal', data => peer.signal(data));
 
@@ -44,7 +48,11 @@
             document.getElementById('status').innerText = 'Connected';
         });
 
-        function handleFile(file) {
+        function processQueue() {
+            if (isSending || fileQueue.length === 0) return;
+            isSending = true;
+            const file = fileQueue.shift();
+            
             document.getElementById('progressContainer').style.display = "block";
             const progressBar = document.getElementById('progressBar');
             const encoder = new TextEncoder();
@@ -62,21 +70,22 @@
                 if (offset < file.size) setTimeout(sendNext, 40);
                 else {
                     peer.send(encoder.encode(JSON.stringify({ type: 'end' })));
-                    document.getElementById('logArea').innerText = "Transfer Complete!";
+                    isSending = false;
+                    processQueue(); // Automatically start the next file in queue
                 }
             };
             sendNext();
         }
 
+        // Receiving
         let receivedChunks = [];
-        let currentFileName = ""; // Global variable to hold the name
-
+        let currentFileName = "";
         peer.on('data', data => {
             if (data[0] === 123) {
                 const msg = JSON.parse(new TextDecoder().decode(data));
                 if (msg.type === 'start') {
                     receivedChunks = [];
-                    currentFileName = msg.name; // Store the name here
+                    currentFileName = msg.name;
                     document.getElementById('logArea').innerText = "Receiving: " + currentFileName;
                 } else if (msg.type === 'end') {
                     const btn = document.getElementById('downloadBtn');
@@ -84,19 +93,28 @@
                     btn.onclick = () => {
                         const a = document.createElement('a');
                         a.href = URL.createObjectURL(new Blob(receivedChunks));
-                        a.download = currentFileName; // Use the stored name
+                        a.download = currentFileName;
                         a.click();
                     };
                 }
             } else {
                 receivedChunks.push(data);
-                document.getElementById('logArea').innerText = "Progress: " + receivedChunks.length + " chunks";
+                document.getElementById('logArea').innerText = "Receiving: " + currentFileName;
             }
         });
 
-        document.getElementById('dropZone').addEventListener('drop', e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); });
-        document.getElementById('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
-        ['dragover', 'dragleave'].forEach(evt => document.getElementById('dropZone').addEventListener(evt, e => e.preventDefault()));
+        document.getElementById('dropZone').addEventListener('drop', e => {
+            e.preventDefault();
+            Array.from(e.dataTransfer.files).forEach(f => fileQueue.push(f));
+            processQueue();
+        });
+        document.getElementById('fileInput').addEventListener('change', e => {
+            Array.from(e.target.files).forEach(f => fileQueue.push(f));
+            processQueue();
+        });
+        
+        // Register PWA Service Worker
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
     </script>
 </body>
 </html>
