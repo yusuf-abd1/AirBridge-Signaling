@@ -27,45 +27,51 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
     <script>
-        const socket = io("https://airbridge-signaling.onrender.com");
-        const peer = new SimplePeer({ initiator: location.hash === '#1', trickle: false });
-        let incomingChunks = [];
+    const log = (msg) => {
+        const div = document.createElement('div');
+        div.innerText = "> " + msg;
+        document.body.appendChild(div);
+        console.log(msg);
+    };
 
-        peer.on('signal', data => socket.emit('signal', data));
-        socket.on('signal', data => peer.signal(data));
+    const socket = io("https://airbridge-signaling.onrender.com");
+    const peer = new SimplePeer({ 
+        initiator: location.hash === '#1', 
+        trickle: false,
+        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+    });
 
-        peer.on('connect', () => {
-            document.getElementById('status').className = 'status-badge connected';
-            document.getElementById('status').innerText = 'Connected';
-        });
+    peer.on('signal', data => {
+        socket.emit('signal', data);
+        log("Signaling...");
+    });
 
-        // Receiving
-        peer.on('data', data => {
-            incomingChunks.push(data);
-            alert("Data chunk received! Total chunks: " + incomingChunks.length);
-            
-            const btn = document.createElement('button');
-            btn.innerText = "Download File";
-            btn.onclick = () => {
-                const blob = new Blob(incomingChunks);
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = 'transferred-file';
-                a.click();
-            };
-            document.querySelector('.card').appendChild(btn);
-        });
+    socket.on('signal', data => peer.signal(data));
 
-        // Sending
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                peer.send(event.target.result);
-                document.getElementById('fileInfo').innerText = "Sent: " + file.name;
-            };
-            reader.readAsArrayBuffer(file);
-        });
+    peer.on('connect', () => {
+        document.getElementById('status').innerText = 'Connected';
+        log("P2P Connected!");
+    });
+
+    peer.on('data', data => {
+        log("Data received!");
+        const blob = new Blob([data]);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'file';
+        a.innerText = "CLICK TO DOWNLOAD";
+        a.style.display = "block";
+        a.style.marginTop = "20px";
+        document.querySelector('.card').appendChild(a);
+    });
+
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            log("Sending: " + file.name);
+            peer.send(file);
+        }
+    });
     </script>
 </body>
 </html>
