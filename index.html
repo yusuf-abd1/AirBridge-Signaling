@@ -5,25 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AirBridge P2P</title>
     <style>
-        body { background: #0a0a0c; color: #e2e8f0; font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
-        .container { background: #15151a; padding: 20px; border-radius: 15px; width: 100%; max-width: 400px; text-align: center; }
-        #status { padding: 10px; border-radius: 5px; margin-bottom: 20px; }
-        .connected { background: #065f46; }
-        .disconnected { background: #991b1b; }
+        :root { --bg: #0f172a; --card: #1e293b; --accent: #8b5cf6; --text: #f8fafc; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: var(--card); padding: 2rem; border-radius: 24px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .status-badge { padding: 6px 16px; border-radius: 50px; font-size: 0.8rem; font-weight: 600; display: inline-block; margin-bottom: 20px; }
+        .disconnected { background: #ef4444; }
+        .connected { background: #10b981; }
+        .drop-zone { border: 2px dashed #475569; padding: 40px; border-radius: 16px; cursor: pointer; transition: 0.3s; margin: 20px 0; }
+        .drop-zone:hover { border-color: var(--accent); background: #334155; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>AirBridge</h2>
-        <div id="status" class="disconnected">Waiting for Peer...</div>
-        <input type="file" id="fileInput">
+    <div class="card">
+        <h1>AirBridge</h1>
+        <div id="status" class="status-badge disconnected">Disconnected</div>
+        <div class="drop-zone" onclick="document.getElementById('fileInput').click()">
+            <p>Click to select file</p>
+            <input type="file" id="fileInput" style="display:none">
+        </div>
+        <div id="fileInfo">No file selected</div>
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
     <script>
-        // REPLACE THIS URL with your Render URL (e.g., https://airbridge-signaling.onrender.com)
-        const socket = io("https://airbridge-signaling.onrender.com"); 
+        // Replace with your actual Render URL
+        const socket = io("https://airbridge-signaling.onrender.com");
 
         const peer = new SimplePeer({ 
             initiator: location.hash === '#1', 
@@ -36,7 +43,14 @@
 
         peer.on('connect', () => {
             const s = document.getElementById('status');
-            s.className = 'connected'; s.innerText = 'Connected: Ready to Transfer';
+            s.className = 'status-badge connected';
+            s.innerText = 'Connected: Ready to Transfer';
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            document.getElementById('fileInfo').innerText = "Sending: " + file.name;
+            peer.send(file); // This sends the file data directly to the peer
         });
     </script>
 </body>
