@@ -28,49 +28,61 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.11.1/simplepeer.min.js"></script>
     <script>
-        const socket = io("https://airbridge-signaling.onrender.com");
-        const peer = new SimplePeer({ 
-            initiator: location.hash === '#1', 
-            trickle: false,
-            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
-        });
+    const socket = io("https://airbridge-signaling.onrender.com");
+    const peer = new SimplePeer({ initiator: location.hash === '#1', trickle: false });
 
-        peer.on('signal', data => socket.emit('signal', data));
-        socket.on('signal', data => peer.signal(data));
+    // ... (keep signal handlers as they are) ...
 
-        peer.on('connect', () => {
-            document.getElementById('status').className = 'status-badge connected';
-            document.getElementById('status').innerText = 'Connected';
-        });
+    let receivedChunks = [];
 
-        // Receiving logic
-        peer.on('data', data => {
-            const message = JSON.parse(data);
+    // RECEIVING LOGIC: Reconstruct the file from chunks
+    peer.on('data', data => {
+        const msg = JSON.parse(data);
+        if (msg.type === 'start') {
+            receivedChunks = [];
+            document.getElementById('logArea').innerText = "Receiving: " + msg.name;
+        } else if (msg.type === 'chunk') {
+            receivedChunks.push(msg.data);
+        } else if (msg.type === 'end') {
+            const blob = new Blob(receivedChunks);
             const btn = document.createElement('button');
-            btn.innerText = "Download " + message.name;
+            btn.innerText = "Download " + msg.name;
             btn.onclick = () => {
                 const link = document.createElement('a');
-                link.href = message.data; // The base64 data
-                link.download = message.name;
+                link.href = URL.createObjectURL(blob);
+                link.download = msg.name;
                 link.click();
             };
             document.querySelector('.card').appendChild(btn);
-        });
+        }
+    });
 
-        // Sending logic
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const payload = JSON.stringify({
-                    name: file.name,
-                    data: event.target.result // Base64 data
-                });
-                peer.send(payload);
-                document.getElementById('logArea').innerText = "Sent: " + file.name;
-            };
-            reader.readAsDataURL(file);
-        });
+    // SENDING LOGIC: Break file into 16KB chunks
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const chunkSize = 16384; 
+        
+        peer.send(JSON.stringify({ type: 'start', name: file.name }));
+        
+        const reader = new FileReader();
+        let offset = 0;
+        
+        reader.onload = (e) => {
+            peer.send(JSON.stringify({ type: 'chunk', data: e.target.result }));
+            offset += e.target.result.byteLength;
+            if (offset < file.size) {
+                readNext();
+            } else {
+                peer.send(JSON.stringify({ type: 'end', name: file.name }));
+            }
+        };
+
+        const readNext = () => {
+            const slice = file.slice(offset, offset + chunkSize);
+            reader.readAsArrayBuffer(slice);
+        };
+        readNext();
+    });
     </script>
 </body>
 </html>
