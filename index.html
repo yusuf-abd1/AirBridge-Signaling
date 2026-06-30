@@ -71,13 +71,13 @@
                 else {
                     peer.send(encoder.encode(JSON.stringify({ type: 'end' })));
                     isSending = false;
-                    processQueue(); // Automatically start the next file in queue
+                    document.getElementById('logArea').innerText = "Finished: " + file.name;
+                    processQueue();
                 }
             };
             sendNext();
         }
 
-        // Receiving
         let receivedChunks = [];
         let currentFileName = "";
         peer.on('data', data => {
@@ -112,8 +112,8 @@
             Array.from(e.target.files).forEach(f => fileQueue.push(f));
             processQueue();
         });
+        ['dragover', 'dragleave'].forEach(evt => document.getElementById('dropZone').addEventListener(evt, e => e.preventDefault()));
         
-        // Register PWA Service Worker
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
     </script>
 </body>
