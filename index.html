@@ -52,6 +52,17 @@
             document.getElementById('fileInfo').innerText = "Sending: " + file.name;
             peer.send(file); // This sends the file data directly to the peer
         });
+
+        peer.on('data', data => {
+             // This receives the data from the other peer
+            const blob = new Blob([data]);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'received-file'; // You can improve this to capture original filenames
+            a.click();
+            alert("File received successfully!");
+        });
     </script>
 </body>
 </html>
