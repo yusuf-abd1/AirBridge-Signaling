@@ -56,7 +56,12 @@
             document.getElementById('progressContainer').style.display = "block";
             const progressBar = document.getElementById('progressBar');
             const encoder = new TextEncoder();
-            peer.send(encoder.encode(JSON.stringify({ type: 'start', name: file.name })));
+            
+            peer.send(encoder.encode(JSON.stringify({ 
+                type: 'start', 
+                name: file.name, 
+                mimeType: file.type 
+            })));
             
             let offset = 0;
             const reader = new FileReader();
@@ -79,27 +84,27 @@
         }
 
         let receivedChunks = [];
-        let currentFileName = "";
+        let currentFileMeta = { name: "", type: "" };
         peer.on('data', data => {
             if (data[0] === 123) {
                 const msg = JSON.parse(new TextDecoder().decode(data));
                 if (msg.type === 'start') {
                     receivedChunks = [];
-                    currentFileName = msg.name;
-                    document.getElementById('logArea').innerText = "Receiving: " + currentFileName;
+                    currentFileMeta = { name: msg.name, type: msg.mimeType };
+                    document.getElementById('logArea').innerText = "Receiving: " + msg.name;
                 } else if (msg.type === 'end') {
                     const btn = document.getElementById('downloadBtn');
                     btn.style.display = "block";
                     btn.onclick = () => {
                         const a = document.createElement('a');
-                        a.href = URL.createObjectURL(new Blob(receivedChunks));
-                        a.download = currentFileName;
+                        a.href = URL.createObjectURL(new Blob(receivedChunks, { type: currentFileMeta.type }));
+                        a.download = currentFileMeta.name;
                         a.click();
                     };
                 }
             } else {
                 receivedChunks.push(data);
-                document.getElementById('logArea').innerText = "Receiving: " + currentFileName;
+                document.getElementById('logArea').innerText = "Receiving: " + currentFileMeta.name;
             }
         });
 
