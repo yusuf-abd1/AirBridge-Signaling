@@ -1,11 +1,10 @@
-const CACHE_NAME = 'airbridge-v2'; // Changing this triggers an update
-
+const CACHE_NAME = 'airbridge-v2'; 
 self.addEventListener('install', (event) => {
-    self.skipWaiting(); // Force the new SW to activate immediately
+    self.skipWaiting(); 
 });
 
 self.addEventListener('activate', (event) => {
-    event.waitUntil(caches.delete(CACHE_NAME)); // Delete old cache
+    event.waitUntil(caches.delete(CACHE_NAME)); 
 });
 
 self.addEventListener('fetch', () => {});
